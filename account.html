@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Casanova Enterprises, LLC</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#ffffff;
+      --card:#f4f4f4;
+      --text:#111;
+      --muted:#8a8a8a;
+      --danger:#e53935;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0;padding:20px;
+      background:var(--bg);color:var(--text);
+      font-family:"Poppins",system-ui;
+      display:flex;flex-direction:column;align-items:center;
+    }
+    .header{width:100%;max-width:420px;text-align:center;margin-bottom:20px;}
+    .title{font-size:20px;font-weight:700;cursor:pointer;}
+
+    .card{
+      width:100%;max-width:420px;
+      background:var(--card);padding:20px;border-radius:16px;
+      margin-bottom:16px;
+    }
+    .label{color:var(--muted);font-size:12px;margin-bottom:6px;}
+    .balance{font-size:42px;font-weight:700;}
+
+    .section{
+      width:100%;max-width:420px;
+      background:var(--card);
+      padding:14px;border-radius:14px;
+      margin-bottom:14px;
+    }
+    .section-title{font-size:14px;color:var(--muted);margin-bottom:6px;font-weight:600;}
+
+    .item{
+      display:flex;justify-content:space-between;
+      padding:10px 4px;border-bottom:1px solid #ddd;
+      font-size:14px;
+    }
+    .item:last-child{border-bottom:none;}
+    .in{color:var(--text);font-weight:700;}
+    .out{color:var(--danger);font-weight:700;}
+
+    .hidden-panel{
+      width:100%;max-width:420px;
+      display:none;flex-direction:column;gap:8px;margin-bottom:16px;
+    }
+    .input{
+      padding:10px;border-radius:10px;
+      border:1px solid #ccc;font-size:14px;background:#fff;
+    }
+    .btn{
+      padding:10px;background:#111;color:#fff;
+      border:none;border-radius:10px;font-weight:700;
+      cursor:pointer;font-size:14px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div id="title" class="title">Casanova Enterprises, LLC</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Balance disponible</div>
+    <div id="balance" class="balance">$500</div>
+  </div>
+
+  <!-- PANEL OCULTO: INGRESO + GASTO -->
+  <div id="hidden-panel" class="hidden-panel">
+    <input id="ingreso-monto" class="input" type="number" placeholder="Monto ingreso" />
+    <input id="ingreso-desc" class="input" type="text" placeholder="Descripción ingreso" />
+    <button id="add-ingreso" class="btn">Agregar ingreso</button>
+
+    <input id="gasto-monto" class="input" type="number" placeholder="Monto gasto" />
+    <input id="gasto-desc" class="input" type="text" placeholder="Descripción gasto" />
+    <button id="add-gasto" class="btn">Agregar gasto</button>
+  </div>
+
+  <!-- MOVIMIENTOS -->
+  <div class="section">
+    <div class="section-title">Movimientos</div>
+    <div id="movements-list"></div>
+  </div>
+
+<script>
+const THREE_HOURS = 3 * 60 * 60 * 1000;
+
+const AUTO = [
+  { amount:5000, name:"Carro deo2" },
+  { amount:35000, name:"Laptop veco" },
+  { amount:2500, name:"iPhone 14 Pro Max" },
+  { amount:11999, name:"Mois" }
+];
+
+const KEY_BAL="bal_v1";
+const KEY_LAST="last_v1";
+const KEY_MOV="mov_v1";
+
+let balance = Number(localStorage.getItem(KEY_BAL));
+if(!balance && balance!==0) balance = 500;
+
+let last = Number(localStorage.getItem(KEY_LAST));
+if(!last) last = Date.now();
+
+let moves = JSON.parse(localStorage.getItem(KEY_MOV)||"[]");
+
+function money(v){return "$"+Number(v).toLocaleString("en-US");}
+
+function esc(s){
+  return String(s).replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function renderBalance(){
+  document.getElementById("balance").textContent = money(balance);
+}
+function renderMovs(){
+  const box = document.getElementById("movements-list");
+  box.innerHTML = "";
+  if(!moves.length){
+    box.innerHTML = `<div class="item"><div style='color:#888'>Sin movimientos</div><div></div></div>`;
+    return;
+  }
+  moves.slice().sort((a,b)=>b.t-a.t).forEach(m=>{
+    box.innerHTML += `
+      <div class="item">
+        <div>${esc(m.desc||m.name)}<div style='font-size:11px;color:#999;'>${new Date(m.t).toLocaleString()}</div></div>
+        <div class="${m.type==='in'?'in':'out'}">${m.type==='in'?'+' : '-'}${money(m.amount).replace('$','')}</div>
+      </div>
+    `;
+  });
+}
+
+function save(){
+  localStorage.setItem(KEY_BAL,balance);
+  localStorage.setItem(KEY_LAST,last);
+  localStorage.setItem(KEY_MOV,JSON.stringify(moves));
+}
+
+function calcMissed(){
+  const now = Date.now();
+  const diff = now - last;
+  if(diff >= THREE_HOURS){
+    const cycles = Math.floor(diff / THREE_HOURS);
+    for(let i=0;i<cycles;i++){
+      let pick = AUTO[Math.floor(Math.random()*AUTO.length)];
+      balance += pick.amount;
+      moves.push({ type:'in', amount:pick.amount, name:pick.name, t: now - (cycles-i)*THREE_HOURS });
+    }
+  }
+  last = now;
+  save();
+}
+
+setInterval(()=>{
+  let pick = AUTO[Math.floor(Math.random()*AUTO.length)];
+  balance += pick.amount;
+  moves.push({ type:'in', amount:pick.amount, name:pick.name, t:Date.now() });
+  save();renderBalance();renderMovs();
+}, THREE_HOURS);
+
+/* panel oculto */
+let clicks = 0;
+document.getElementById("title").addEventListener("click",()=>{
+  clicks++;
+  if(clicks>=4){
+    const p = document.getElementById("hidden-panel");
+    p.style.display = p.style.display==="flex"?"none":"flex";
+    clicks=0;
+  }
+});
+
+/* ingreso manual */
+document.getElementById("add-ingreso").addEventListener("click",()=>{
+  let a = Number(document.getElementById("ingreso-monto").value);
+  let d = document.getElementById("ingreso-desc").value;
+  if(!a||a<=0||!d.trim()) return;
+  balance+=a;
+  moves.push({type:"in", amount:a, desc:d.trim(), t:Date.now()});
+  save();renderBalance();renderMovs();
+});
+
+/* gasto manual */
+document.getElementById("add-gasto").addEventListener("click",()=>{
+  let a = Number(document.getElementById("gasto-monto").value);
+  let d = document.getElementById("gasto-desc").value;
+  if(!a||a<=0||!d.trim()) return;
+  balance-=a;
+  moves.push({type:"out", amount:a, desc:d.trim(), t:Date.now()});
+  save();renderBalance();renderMovs();
+});
+
+/* init */
+calcMissed();
+renderBalance();
+renderMovs();
+</script>
+
+</body>
+</html>
